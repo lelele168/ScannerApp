@@ -27,25 +27,39 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    # 核心修复：彻底解决 gradlew 无法执行的问题
-    - name: Fix gradlew execution permissions and format
+    # 核心：彻底重建 Gradle Wrapper 目录（解决 jar 包缺失）
+    - name: Fully rebuild Gradle Wrapper (fix GradleWrapperMain error)
       run: |
         cd android
         
-        # 1. 强制重置文件权限（777 确保最高执行权限）
-        chmod 777 gradlew
+        # 1. 删除损坏/缺失的 wrapper 目录
+        rm -rf gradle/wrapper
         
-        # 2. 修复 Windows 换行符（CRLF → LF）导致的执行失败
-        # Linux 无法识别 Windows 换行符，会报 "required file not found"
+        # 2. 重新创建 wrapper 目录
+        mkdir -p gradle/wrapper
+        
+        # 3. 下载官方 Gradle 7.5 Wrapper jar 包（直接替换缺失的文件）
+        curl -o gradle/wrapper/gradle-wrapper.jar \
+          https://services.gradle.org/distributions/gradle-7.5-wrapper.jar
+        
+        # 4. 生成正确的 gradle-wrapper.properties 配置文件
+        cat > gradle/wrapper/gradle-wrapper.properties << EOF
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOF
+        
+        # 5. 修复 gradlew 权限和换行符（保留之前的修复）
+        chmod 777 gradlew
         sed -i 's/\r$//' gradlew
         
-        # 3. 验证脚本格式和权限
-        echo "=== 验证 gradlew 信息 ==="
-        ls -la gradlew  # 确认权限是 -rwxrwxrwx
-        file gradlew   # 确认是 "POSIX shell script" 而非 "text file"
-        
-        # 4. 重建 Gradle Wrapper（兜底解决依赖缺失）
-        bash gradlew wrapper --gradle-version 7.5 --distribution-type all
+        # 6. 验证 wrapper 文件是否存在
+        echo "=== Wrapper 文件列表 ==="
+        ls -la gradle/wrapper/
 
     - name: Build Android Debug APK
       run: bash gradlew assembleDebug --stacktrace --info

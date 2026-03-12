@@ -4,7 +4,7 @@ env:
   ANDROID_HOME: /usr/local/android-sdk
   NODE_OPTIONS: --max_old_space_size=4096
   EXPO_NO_DOCTOR: true
-  CI: 1  # 非交互模式核心配置，替代--yes
+  CI: 1
 
 on:
   push:
@@ -23,60 +23,57 @@ jobs:
       with:
         fetch-depth: 0
 
-    # 1. 安装 Node.js（关闭缓存）
+    # 1. 安装 Node.js
     - name: Set up Node.js 20
       uses: actions/setup-node@v4
       with:
         node-version: 20
         cache-dependency-path: ''
 
-    # 2. 重建 package.json（单行紧凑 JSON，无空行）
-    - name: Rebuild package.json with core dependencies
+    # 2. 重建 package.json（核心依赖）
+    - name: Rebuild package.json
       run: |
         rm -f package.json package-lock.json
-        # printf 生成无空行的单行 JSON
         printf '{"name":"scannerapp","version":"1.0.0","private":true,"dependencies":{"expo":"^50.0.17","react":"18.2.0","react-native":"0.73.6"},"scripts":{"prebuild":"expo prebuild","android":"expo run:android"}}' > package.json
-        
-        # 安装核心依赖，强制跳过冲突
         npm install --no-audit --no-fund --force
 
-    # 3. 安装稳定版 Expo CLI
+    # 3. 安装 Expo CLI
     - name: Install Expo CLI
       run: npm install -g expo-cli@6.3.10
 
-    # 4. 生成无空行的 app.json + Expo 原生代码（移除--yes参数）
-    - name: Generate valid app.json and Expo native code
+    # 4. 生成 app.json + Expo 原生代码
+    - name: Generate app.json and Expo code
       run: |
         rm -f app.json
-        # 单行紧凑 JSON，无任何空行/解析错误
         printf '{"expo":{"name":"ScannerApp","slug":"ScannerApp","version":"1.0.0","platforms":["android"],"android":{"package":"com.scannerapp","compileSdkVersion":33,"targetSdkVersion":33,"minSdkVersion":24}}}' > app.json
-        
-        # 仅保留核心参数，CI=1 已确保非交互模式
         npx expo prebuild --platform android --clean
 
-    # 5. 安装系统级 Gradle 7.5
-    - name: Install Gradle 7.5 globally
+    # 5. 安装 Gradle 7.6（核心修复：升级到适配 Foojay 插件的版本）
+    - name: Install Gradle 7.6 globally
       run: |
-        wget https://services.gradle.org/distributions/gradle-7.5-bin.zip -P /tmp
-        unzip -q /tmp/gradle-7.5-bin.zip -d /opt
-        ln -s /opt/gradle-7.5/bin/gradle /usr/local/bin/gradle
+        # 下载 Gradle 7.6（替代 7.5）
+        wget https://services.gradle.org/distributions/gradle-7.6-bin.zip -P /tmp
+        unzip -q /tmp/gradle-7.6-bin.zip -d /opt
+        ln -s /opt/gradle-7.6/bin/gradle /usr/local/bin/gradle
+        
+        # 验证 Gradle 版本（确保是 7.6）
         gradle --version
 
-    # 6. 安装 JDK 17
+    # 6. 安装 JDK 17（必须配套）
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    # 7. 构建 Android Debug APK（精简参数，减少冲突）
+    # 7. 构建 Android Debug APK（适配 Gradle 7.6）
     - name: Build Android Debug APK
       run: gradle assembleDebug --no-parallel
       working-directory: ./android
       env:
         ORG_GRADLE_PROJECT_compositeBuild: false
 
-    # 8. 上传产物（构建成功则上传）
+    # 8. 上传产物
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       if: success()

@@ -1,0 +1,38 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle  # 缓存 Gradle 依赖，加速构建
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x android/gradlew  # 指向 android 目录下的 gradlew
+      working-directory: ./android   # 切换到 android 目录执行命令
+
+    - name: Build with Gradle
+      run: ./gradlew build  # 执行打包命令（已在 android 目录下）
+      working-directory: ./android   # 核心：指定构建目录为 android
+      
+    # 可选：上传打包产物（APK/AAB），方便下载
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-build-output
+        path: |
+          android/app/build/outputs/
+          android/build/reports/

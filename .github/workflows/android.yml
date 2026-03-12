@@ -27,37 +27,35 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    # 核心：彻底重建 Gradle Wrapper 目录（解决 jar 包缺失）
+    # 核心：重建 Gradle Wrapper（修复 YAML 语法 + jar 缺失问题）
     - name: Fully rebuild Gradle Wrapper (fix GradleWrapperMain error)
       run: |
         cd android
         
-        # 1. 删除损坏/缺失的 wrapper 目录
+        # 1. 删除损坏的 wrapper 目录
         rm -rf gradle/wrapper
         
         # 2. 重新创建 wrapper 目录
         mkdir -p gradle/wrapper
         
-        # 3. 下载官方 Gradle 7.5 Wrapper jar 包（直接替换缺失的文件）
+        # 3. 下载官方 Gradle 7.5 Wrapper jar 包
         curl -o gradle/wrapper/gradle-wrapper.jar \
           https://services.gradle.org/distributions/gradle-7.5-wrapper.jar
         
-        # 4. 生成正确的 gradle-wrapper.properties 配置文件
-        cat > gradle/wrapper/gradle-wrapper.properties << EOF
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-bin.zip
-networkTimeout=10000
-validateDistributionUrl=true
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-EOF
+        # 4. 生成 gradle-wrapper.properties（用 echo 逐行写入，避免 YAML 语法错误）
+        echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+        echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
+        echo "networkTimeout=10000" >> gradle/wrapper/gradle-wrapper.properties
+        echo "validateDistributionUrl=true" >> gradle/wrapper/gradle-wrapper.properties
+        echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+        echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
         
-        # 5. 修复 gradlew 权限和换行符（保留之前的修复）
+        # 5. 修复 gradlew 权限和换行符
         chmod 777 gradlew
         sed -i 's/\r$//' gradlew
         
-        # 6. 验证 wrapper 文件是否存在
+        # 6. 验证 wrapper 文件
         echo "=== Wrapper 文件列表 ==="
         ls -la gradle/wrapper/
 

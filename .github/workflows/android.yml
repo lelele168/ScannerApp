@@ -46,7 +46,7 @@ jobs:
     - name: Generate app.json (Expo 49)
       run: |
         rm -f app.json
-        printf '{"expo":{"name":"ScannerApp","slug":"ScannerApp","version":"1.0.0","platforms":["android"],"android":{"package":"com.scannerapp","compileSdkVersion":33,"targetSdkVersion":33,"minSdkVersion":24,"buildType":"app-bundle"}}}' > app.json
+        printf '{"expo":{"name":"ScannerApp","slug":"ScannerApp","version":"1.0.0","platforms":["android"],"android":{"package":"com.scannerapp","compileSdkVersion":33,"targetSdkVersion":33,"minSdkVersion":24}}}' > app.json
         npx expo prebuild --platform android --clean
 
     # 5. 安装 Gradle 7.5
@@ -64,23 +64,12 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
 
-    # 7. 创建调试签名密钥（核心修复：检查是否已存在，避免重复生成）
-    - name: Create debug keystore (skip if exists)
-      run: |
-        cd android/app
-        # 检查密钥是否已存在，不存在才生成
-        if ! keytool -list -keystore debug.keystore -storepass android -alias androiddebugkey 2>/dev/null; then
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-        else
-          echo "调试密钥 androiddebugkey 已存在，跳过生成"
-        fi
-
-    # 8. 配置 Release 构建（签名 + 优化）
-    - name: Configure Release build
+    # 7. 配置 Release 构建（仅保留签名，移除混淆/压缩）
+    - name: Configure Release build (minimal)
       run: |
         cd android
         
-        # 逐行写入 Release 签名配置
+        # 仅添加签名配置，移除所有可能冲突的优化项
         echo '' >> app/build.gradle
         echo 'android {' >> app/build.gradle
         echo '    signingConfigs {' >> app/build.gradle
@@ -94,34 +83,25 @@ jobs:
         echo '    buildTypes {' >> app/build.gradle
         echo '        release {' >> app/build.gradle
         echo '            signingConfig signingConfigs.release' >> app/build.gradle
-        echo '            minifyEnabled true' >> app/build.gradle
-        echo '            shrinkResources true' >> app/build.gradle
-        echo '            proguardFiles getDefaultProguardFile(''proguard-android-optimize.txt''), ''proguard-rules.pro''' >> app/build.gradle
+        echo '            minifyEnabled false' >> app/build.gradle
+        echo '            shrinkResources false' >> app/build.gradle
         echo '        }' >> app/build.gradle
         echo '    }' >> app/build.gradle
         echo '}' >> app/build.gradle
-        
-        # 创建 ProGuard 混淆规则
-        echo '# React Native 基础混淆规则' > app/proguard-rules.pro
-        echo '-keep class com.facebook.react.** { *; }' >> app/proguard-rules.pro
-        echo '-keep class expo.modules.** { *; }' >> app/proguard-rules.pro
-        echo '-keep class com.scannerapp.** { *; }' >> app/proguard-rules.pro
-        echo '-dontwarn com.facebook.react.**' >> app/proguard-rules.pro
-        echo '-dontwarn expo.modules.**' >> app/proguard-rules.pro
 
-    # 9. 编译正式版 Release APK
+    # 8. 编译正式版 Release APK（极简模式）
     - name: Build Android Release APK
-      run: gradle assembleRelease --no-parallel --info
+      run: gradle assembleRelease --no-parallel --no-daemon
       working-directory: ./android
       env:
         ORG_GRADLE_PROJECT_compositeBuild: false
+        # 禁用所有可能的冲突特性
+        ORG_GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8"
 
-    # 10. 上传正式版 APK
+    # 9. 上传正式版 APK
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       if: success()
       with:
         name: scannerapp-release-apk
-        path: |
-          android/app/build/outputs/apk/release/*.apk
-          android/app/build/outputs/apk/release/*.md5
+        path: android/app/build/outputs/apk/release/*.apk

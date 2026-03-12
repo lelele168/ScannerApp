@@ -1,4 +1,6 @@
 name: Android CI
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   push:
@@ -12,27 +14,27 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    
-    - name: set up JDK 11
+
+    - name: set up JDK 17
       uses: actions/setup-java@v4
       with:
-        java-version: '11'
+        java-version: '17'  # 升级到 JDK 17，适配新版 Gradle/Expo
         distribution: 'temurin'
-        cache: gradle  # 缓存 Gradle 依赖，加速构建
+        cache: gradle
+
+    - name: Check android directory exists
+      run: ls -la android/  # 先确认目录结构，方便排查
 
     - name: Grant execute permission for gradlew
-      run: chmod +x android/gradlew  # 指向 android 目录下的 gradlew
-      working-directory: ./android   # 切换到 android 目录执行命令
+      run: chmod +x gradlew
+      working-directory: ./android  # 切到 android 目录
 
     - name: Build with Gradle
-      run: ./gradlew build  # 执行打包命令（已在 android 目录下）
-      working-directory: ./android   # 核心：指定构建目录为 android
-      
-    # 可选：上传打包产物（APK/AAB），方便下载
-    - name: Upload build artifacts
+      run: ./gradlew assembleDebug --stacktrace  # --stacktrace 打印详细错误
+      working-directory: ./android
+
+    - name: Upload debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: android-build-output
-        path: |
-          android/app/build/outputs/
-          android/build/reports/
+        name: debug-apk
+        path: android/app/build/outputs/apk/debug/

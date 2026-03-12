@@ -29,58 +29,60 @@ jobs:
         node-version: 20
         cache-dependency-path: ''
 
-    # 2. 彻底修复 package.json，删除报错依赖 + 重建核心依赖
-    - name: Fix package.json and install core dependencies
+    # 2. 完全重建 package.json（只保留核心依赖，删除所有第三方依赖）
+    - name: Rebuild package.json with only core dependencies
       run: |
-        # 备份原 package.json（可选）
-        if [ -f package.json ]; then
-          cp package.json package.json.bak
-          
-          # 核心：删除 package.json 中所有 @react-native-google-ml-kit 相关依赖
-          jq 'del(.dependencies["@react-native-google-ml-kit/text-recognition"])' package.json > temp.json
-          mv temp.json package.json
-          
-          # 额外：删除所有 ML Kit 相关依赖（防止遗漏）
-          jq 'del(.dependencies[] | select(contains("ml-kit")))' package.json > temp.json
-          mv temp.json package.json
-        else
-          # 无 package.json 则新建（YAML 语法修复：用 echo 逐行写入，避免 EOF 冲突）
-          echo '{' > package.json
-          echo '  "name": "scannerapp",' >> package.json
-          echo '  "version": "1.0.0",' >> package.json
-          echo '  "dependencies": {' >> package.json
-          echo '    "expo": "^50.0.0",' >> package.json
-          echo '    "react": "18.2.0",' >> package.json
-          echo '    "react-native": "0.73.6"' >> package.json
-          echo '  },' >> package.json
-          echo '  "scripts": {' >> package.json
-          echo '    "prebuild": "expo prebuild"' >> package.json
-          echo '  }' >> package.json
-          echo '}' >> package.json
-        fi
+        # 彻底删除原 package.json（避免残留有问题的依赖）
+        rm -f package.json package-lock.json
         
-        # 安装核心依赖（此时已无报错的 ML Kit 依赖）
-        npm install --no-audit --no-fund
+        # 新建纯净的 package.json，仅包含 Expo 核心依赖
+        echo '{' > package.json
+        echo '  "name": "scannerapp",' >> package.json
+        echo '  "version": "1.0.0",' >> package.json
+        echo '  "private": true,' >> package.json
+        echo '  "dependencies": {' >> package.json
+        echo '    "expo": "^50.0.17",' >> package.json
+        echo '    "react": "18.2.0",' >> package.json
+        echo '    "react-native": "0.73.6"' >> package.json
+        echo '  },' >> package.json
+        echo '  "scripts": {' >> package.json
+        echo '    "prebuild": "expo prebuild",' >> package.json
+        echo '    "android": "expo run:android"' >> package.json
+        echo '  }' >> package.json
+        echo '}' >> package.json
         
-        # 验证依赖：确认无 ML Kit 相关包
-        echo "=== 已安装的依赖 ==="
-        npm list | grep -v "ml-kit"
+        # 安装核心依赖（仅 Expo/React/React Native，无任何第三方包）
+        npm install --no-audit --no-fund --force
+        
+        # 验证：只显示核心依赖
+        echo "=== 已安装的核心依赖 ==="
+        npm list expo react react-native
 
     # 3. 安装 Expo CLI
     - name: Install Expo CLI
-      run: npm install -g expo-cli
+      run: npm install -g expo-cli@6.3.10  # 指定稳定版本，避免最新版兼容问题
 
-    # 4. 生成 Expo 原生配置（忽略插件错误）
-    - name: Generate Expo Android native code
+    # 4. 生成纯净的 Expo Android 原生代码
+    - name: Generate clean Expo Android native code
       run: |
-        # 清理 app.json 中的 ML Kit 插件配置
-        if [ -f app.json ]; then
-          jq 'del(.expo.plugins[] | select(contains("ml-kit")))' app.json > temp.json
-          mv temp.json app.json
-        fi
+        # 清理/重建 app.json（只保留核心配置，删除所有第三方插件）
+        rm -f app.json
+        echo '{' > app.json
+        echo '  "expo": {' >> app.json
+        echo '    "name": "ScannerApp",' >> app.json
+        echo '    "slug": "ScannerApp",' >> app.json
+        echo '    "version": "1.0.0",' >> app.json
+        echo '    "platforms": ["android"],' >> app.json
+        echo '    "android": {' >> app.json
+        echo '      "package": "com.scannerapp",' >> app.json
+        echo '      "compileSdkVersion": 33,' >> app.json
+        echo '      "targetSdkVersion": 33,' >> app.json
+        echo '      "minSdkVersion": 24' >> app.json
+        echo '    }' >> app.json
+        echo '  }' >> app.json
         
-        # 生成原生代码
-        npx expo prebuild --platform android --clean
+        # 生成原生代码（纯净版，无第三方插件）
+        npx expo prebuild --platform android --clean --non-interactive
 
     # 5. 安装系统级 Gradle 7.5
     - name: Install Gradle 7.5 globally
@@ -97,8 +99,8 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # 7. 构建 Debug APK
-    - name: Build Android Debug APK
+    # 7. 构建纯净版 Debug APK
+    - name: Build Clean Android Debug APK
       run: gradle assembleDebug --stacktrace --info --no-parallel
       working-directory: ./android
       env:

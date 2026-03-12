@@ -64,17 +64,34 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
 
-    # 7. 配置 Release 构建（核心修复：Base64 写入配置，无 YAML 冲突）
-    - name: Configure Release build (Base64 safe)
+    # 7. 配置 Release 构建（核心修复：文件生成到 app 目录，路径正确）
+    - name: Configure Release build (correct path)
       run: |
-        cd android
+        cd android/app
         
-        # 核心：用 Base64 编码写入签名配置，彻底避开 YAML 语法冲突
-        echo "YW5kcm9pZCB7CiAgICBzaWduaW5nQ29uZmlncyB7CiAgICAgICAgcmVsZWFzZSB7CiAgICAgICAgICAgIHN0b3JlRmlsZSBmaWxlKCJkZWJ1Z2gua2V5c3RvcmUiKQogICAgICAgICAgICBzdG9yZVBBc3N3b3JkICJhbmRyb2lkIgogICAgICAgICAgICBrZXlBbGlhcyAiYW5kcm9pZWRlYnVnZWtleSIKICAgICAgICAgICAga2V5UGFzc3dvcmQgImFuZHJvaWQiCiAgICAgICAgICAgIHN0b3JlVHlwZSAiamtzIgogICAgICAgIH0KICAgICB9CiAgICBidWlsZFR5cGVzIHsKICAgICAgICByZWxlYXNlIHsKICAgICAgICAgICAgc2lnbmluZ0NvbmZpZyBzaWduaW5nQ29uZmlncy5yZWxlYXNlCiAgICAgICAgICAgICAgbWluaWZ5RW5hYmxlZCBmYWxzZQogICAgICAgICAgICAgc2hyaW5rUmVzb3VyY2VzIGZhbHNlCiAgICAgICAgfQogICAgfQp9Cg==" | base64 -d > release-signing.gradle
+        # 直接在 app 目录生成签名配置文件，路径100%正确
+        echo "android {" > release-signing.gradle
+        echo "    signingConfigs {" >> release-signing.gradle
+        echo "        release {" >> release-signing.gradle
+        echo "            storeFile file('debug.keystore')" >> release-signing.gradle
+        echo "            storePassword 'android'" >> release-signing.gradle
+        echo "            keyAlias 'androiddebugkey'" >> release-signing.gradle
+        echo "            keyPassword 'android'" >> release-signing.gradle
+        echo "            storeType 'jks'" >> release-signing.gradle
+        echo "        }" >> release-signing.gradle
+        echo "    }" >> release-signing.gradle
+        echo "    buildTypes {" >> release-signing.gradle
+        echo "        release {" >> release-signing.gradle
+        echo "            signingConfig signingConfigs.release" >> release-signing.gradle
+        echo "            minifyEnabled false" >> release-signing.gradle
+        echo "            shrinkResources false" >> release-signing.gradle
+        echo "        }" >> release-signing.gradle
+        echo "    }" >> release-signing.gradle
+        echo "}" >> release-signing.gradle
         
-        # 导入配置到 app/build.gradle
-        echo '' >> app/build.gradle
-        echo 'apply from: "release-signing.gradle"' >> app/build.gradle
+        # 导入配置（同目录，路径无误）
+        echo '' >> build.gradle
+        echo 'apply from: "release-signing.gradle"' >> build.gradle
 
     # 8. 编译正式版 Release APK
     - name: Build Android Release APK

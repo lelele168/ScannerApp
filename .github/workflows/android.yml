@@ -64,38 +64,44 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
 
-    # 7. 配置 Release 构建（仅保留签名，移除混淆/压缩）
-    - name: Configure Release build (minimal)
+    # 7. 配置 Release 构建（核心修复：Gradle 标准签名语法）
+    - name: Configure Release build (Gradle standard syntax)
       run: |
         cd android
         
-        # 仅添加签名配置，移除所有可能冲突的优化项
+        # 核心修复：用 Gradle 官方标准语法配置签名，无转义/冲突
+        # 创建临时配置文件，避免拼接冲突
+        cat > release-signing.gradle << 'EOF'
+android {
+    signingConfigs {
+        release {
+            storeFile file("debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+            storeType "jks"
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+EOF
+        
+        # 将签名配置导入到 app/build.gradle（末尾追加）
         echo '' >> app/build.gradle
-        echo 'android {' >> app/build.gradle
-        echo '    signingConfigs {' >> app/build.gradle
-        echo '        release {' >> app/build.gradle
-        echo '            storeFile file(''debug.keystore'')' >> app/build.gradle
-        echo '            storePassword ''android''' >> app/build.gradle
-        echo '            keyAlias ''androiddebugkey''' >> app/build.gradle
-        echo '            keyPassword ''android''' >> app/build.gradle
-        echo '        }' >> app/build.gradle
-        echo '    }' >> app/build.gradle
-        echo '    buildTypes {' >> app/build.gradle
-        echo '        release {' >> app/build.gradle
-        echo '            signingConfig signingConfigs.release' >> app/build.gradle
-        echo '            minifyEnabled false' >> app/build.gradle
-        echo '            shrinkResources false' >> app/build.gradle
-        echo '        }' >> app/build.gradle
-        echo '    }' >> app/build.gradle
-        echo '}' >> app/build.gradle
+        echo 'apply from: "release-signing.gradle"' >> app/build.gradle
 
-    # 8. 编译正式版 Release APK（极简模式）
+    # 8. 编译正式版 Release APK（禁用守护进程）
     - name: Build Android Release APK
-      run: gradle assembleRelease --no-parallel --no-daemon
+      run: gradle assembleRelease --no-parallel --no-daemon --info
       working-directory: ./android
       env:
         ORG_GRADLE_PROJECT_compositeBuild: false
-        # 禁用所有可能的冲突特性
         ORG_GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8"
 
     # 9. 上传正式版 APK

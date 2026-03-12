@@ -37,7 +37,6 @@ jobs:
           cp package.json package.json.bak
           
           # 核心：删除 package.json 中所有 @react-native-google-ml-kit 相关依赖
-          # 使用 jq 工具（GitHub Actions 环境自带）修改 JSON，比 sed 更可靠
           jq 'del(.dependencies["@react-native-google-ml-kit/text-recognition"])' package.json > temp.json
           mv temp.json package.json
           
@@ -45,21 +44,19 @@ jobs:
           jq 'del(.dependencies[] | select(contains("ml-kit")))' package.json > temp.json
           mv temp.json package.json
         else
-          # 无 package.json 则新建，只包含核心依赖
-          cat > package.json << EOF
-{
-  "name": "scannerapp",
-  "version": "1.0.0",
-  "dependencies": {
-    "expo": "^50.0.0",
-    "react": "18.2.0",
-    "react-native": "0.73.6"
-  },
-  "scripts": {
-    "prebuild": "expo prebuild"
-  }
-}
-EOF
+          # 无 package.json 则新建（YAML 语法修复：用 echo 逐行写入，避免 EOF 冲突）
+          echo '{' > package.json
+          echo '  "name": "scannerapp",' >> package.json
+          echo '  "version": "1.0.0",' >> package.json
+          echo '  "dependencies": {' >> package.json
+          echo '    "expo": "^50.0.0",' >> package.json
+          echo '    "react": "18.2.0",' >> package.json
+          echo '    "react-native": "0.73.6"' >> package.json
+          echo '  },' >> package.json
+          echo '  "scripts": {' >> package.json
+          echo '    "prebuild": "expo prebuild"' >> package.json
+          echo '  }' >> package.json
+          echo '}' >> package.json
         fi
         
         # 安装核心依赖（此时已无报错的 ML Kit 依赖）

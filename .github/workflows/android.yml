@@ -20,50 +20,40 @@ jobs:
       with:
         fetch-depth: 0
 
+    # 1. 安装系统级 Gradle 7.5（不依赖本地 wrapper）
+    - name: Install Gradle 7.5 globally
+      run: |
+        # 下载并解压 Gradle 7.5
+        wget https://services.gradle.org/distributions/gradle-7.5-bin.zip -P /tmp
+        unzip -q /tmp/gradle-7.5-bin.zip -d /opt
+        ln -s /opt/gradle-7.5/bin/gradle /usr/local/bin/gradle
+        
+        # 验证 Gradle 安装
+        gradle --version
+
+    # 2. 安装 JDK 17（必须和 Gradle 7.5 匹配）
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
 
-    # 核心：重建 Gradle Wrapper（修复 YAML 语法 + jar 缺失问题）
-    - name: Fully rebuild Gradle Wrapper (fix GradleWrapperMain error)
+    # 3. 清理 android 目录（移除损坏的 wrapper）
+    - name: Clean Android directory
       run: |
         cd android
-        
-        # 1. 删除损坏的 wrapper 目录
-        rm -rf gradle/wrapper
-        
-        # 2. 重新创建 wrapper 目录
-        mkdir -p gradle/wrapper
-        
-        # 3. 下载官方 Gradle 7.5 Wrapper jar 包
-        curl -o gradle/wrapper/gradle-wrapper.jar \
-          https://services.gradle.org/distributions/gradle-7.5-wrapper.jar
-        
-        # 4. 生成 gradle-wrapper.properties（用 echo 逐行写入，避免 YAML 语法错误）
-        echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
-        echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
-        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-7.5-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
-        echo "networkTimeout=10000" >> gradle/wrapper/gradle-wrapper.properties
-        echo "validateDistributionUrl=true" >> gradle/wrapper/gradle-wrapper.properties
-        echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
-        echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
-        
-        # 5. 修复 gradlew 权限和换行符
-        chmod 777 gradlew
-        sed -i 's/\r$//' gradlew
-        
-        # 6. 验证 wrapper 文件
-        echo "=== Wrapper 文件列表 ==="
-        ls -la gradle/wrapper/
+        # 删除本地 wrapper 避免干扰
+        rm -rf gradle/wrapper gradlew gradlew.bat
+        # 确认目录结构
+        ls -la
 
-    - name: Build Android Debug APK
-      run: bash gradlew assembleDebug --stacktrace --info
+    # 4. 直接用系统 Gradle 构建（核心：不依赖本地 gradlew）
+    - name: Build Android Debug APK with system Gradle
+      run: gradle assembleDebug --stacktrace --info
       working-directory: ./android
       continue-on-error: false
 
+    # 5. 上传产物
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       if: success()

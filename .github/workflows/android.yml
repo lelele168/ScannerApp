@@ -2,6 +2,9 @@ name: Android CI
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ANDROID_HOME: /usr/local/android-sdk
+  # 关键：添加 Expo/React Native 所需环境变量
+  NODE_OPTIONS: --max_old_space_size=4096
+  EXPO_NO_DOCTOR: true
 
 on:
   push:
@@ -20,40 +23,53 @@ jobs:
       with:
         fetch-depth: 0
 
-    # 1. 安装系统级 Gradle 7.5（不依赖本地 wrapper）
+    # 1. 安装 Node.js（Expo/React Native 必须先装 Node 解析依赖）
+    - name: Set up Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+
+    # 2. 安装项目依赖（Expo/React Native 插件依赖 npm 包）
+    - name: Install npm dependencies
+      run: |
+        npm install
+        # 生成/修复 Expo 原生配置（关键：补全 Android 插件依赖）
+        npx expo prebuild --platform android --clean
+
+    # 3. 安装系统级 Gradle 7.5
     - name: Install Gradle 7.5 globally
       run: |
-        # 下载并解压 Gradle 7.5
         wget https://services.gradle.org/distributions/gradle-7.5-bin.zip -P /tmp
         unzip -q /tmp/gradle-7.5-bin.zip -d /opt
         ln -s /opt/gradle-7.5/bin/gradle /usr/local/bin/gradle
-        
-        # 验证 Gradle 安装
         gradle --version
 
-    # 2. 安装 JDK 17（必须和 Gradle 7.5 匹配）
+    # 4. 安装 JDK 17
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    # 3. 清理 android 目录（移除损坏的 wrapper）
-    - name: Clean Android directory
+    # 5. 修复 Android 构建配置（解决插件解析失败）
+    - name: Fix Android build configuration
       run: |
         cd android
-        # 删除本地 wrapper 避免干扰
-        rm -rf gradle/wrapper gradlew gradlew.bat
-        # 确认目录结构
-        ls -la
+        # 强制刷新 Gradle 依赖缓存
+        gradle clean --refresh-dependencies
+        # 修复 settings.gradle 插件解析（Expo 专属）
+        sed -i 's/implementation /api /g' build.gradle app/build.gradle
 
-    # 4. 直接用系统 Gradle 构建（核心：不依赖本地 gradlew）
-    - name: Build Android Debug APK with system Gradle
-      run: gradle assembleDebug --stacktrace --info
+    # 6. 构建 Debug APK（关闭并行构建，减少插件冲突）
+    - name: Build Android Debug APK
+      run: gradle assembleDebug --stacktrace --info --no-parallel
       working-directory: ./android
-      continue-on-error: false
+      env:
+        # 禁用 Gradle 复合构建，解决插件解析问题
+        ORG_GRADLE_PROJECT_compositeBuild: false
 
-    # 5. 上传产物
+    # 7. 上传产物
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       if: success()

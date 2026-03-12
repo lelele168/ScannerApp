@@ -64,18 +64,23 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
 
-    # 7. 创建调试签名密钥（正式版必需）
-    - name: Create debug keystore for release build
+    # 7. 创建调试签名密钥（核心修复：检查是否已存在，避免重复生成）
+    - name: Create debug keystore (skip if exists)
       run: |
         cd android/app
-        keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        # 检查密钥是否已存在，不存在才生成
+        if ! keytool -list -keystore debug.keystore -storepass android -alias androiddebugkey 2>/dev/null; then
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        else
+          echo "调试密钥 androiddebugkey 已存在，跳过生成"
+        fi
 
-    # 8. 配置 Release 构建（核心修复：用 echo 逐行写入，避开 YAML 冲突）
+    # 8. 配置 Release 构建（签名 + 优化）
     - name: Configure Release build
       run: |
         cd android
         
-        # 逐行写入 Release 签名配置（无 EOF 冲突）
+        # 逐行写入 Release 签名配置
         echo '' >> app/build.gradle
         echo 'android {' >> app/build.gradle
         echo '    signingConfigs {' >> app/build.gradle

@@ -1,0 +1,51 @@
+#!/bin/bash
+
+echo "=================================================="
+echo "ScannerApp - 自动部署到 GitHub"
+echo "=================================================="
+
+echo "📧 使用邮箱: 2606910097@qq.com"
+
+# 设置 Git 配置
+git config user.name "ScannerApp Developer"
+git config user.email "2606910097@qq.com"
+
+echo ""
+echo "📋 当前项目状态:"
+git status --porcelain
+echo ""
+echo "📊 提交历史:"
+git log --oneline -3
+
+echo ""
+echo "=================================================="
+echo "请按以下步骤操作:"
+echo "=================================================="
+echo ""
+echo "🎯 步骤 1: 在 GitHub 创建仓库"
+echo "   1. 访问: https://github.com/new"
+echo "   2. Repository name: ScannerApp"
+echo "   3. Description: PDA扫码助手 - React Native扫码应用"
+echo "   4. 选择 Public"
+echo "   5. 点击 'Create repository'"
+echo ""
+echo "🎯 步骤 2: 获取你的 GitHub 用户名"
+echo "   在 GitHub 个人主页查看用户名"
+echo ""
+echo "🎯 步骤 3: 运行连接命令"
+echo "   将以下命令中的 YOUR_USERNAME 替换为你的用户名:"
+echo "   git remote add origin https://github.com/YOUR_USERNAME/ScannerApp.git"
+echo "   git push -u origin main"
+echo ""
+echo "=================================================="
+echo "📁 项目文件已准备完成"
+echo "🚀 只需设置远程仓库即可上传"
+echo ""
+echo "📱 项目特性:"
+echo "   ✅ 完整的扫码应用"
+echo "   ✅ 自动化构建配置"
+echo "   ✅ 多种部署方案"
+echo "   ✅ 详细的使用文档"
+echo ""
+echo "💡 提示: 创建 GitHub 仓库后，告诉我你的用户名，我会帮你自动设置和上传！"
+echo "=================================================="

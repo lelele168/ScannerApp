@@ -1,0 +1,13 @@
+#!/bin/bash
+# Mock adb for development
+echo "Mock ADB - Android Debug Bridge"
+echo "Usage: adb [options]"
+echo "This is a mock version for development purposes"
+echo ""
+echo "Available commands would include:"
+echo "  devices - list connected devices"
+echo "  install - install app"
+echo "  logcat - view device log"
+echo "  shell - run remote shell"
+echo ""
+echo "In a real environment, this would be the actual Android Debug Bridge"

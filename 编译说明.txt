@@ -1,0 +1,80 @@
+==================================================
+  ScannerApp - 编译方式说明
+==================================================
+
+==================================================
+  方式一：GitHub Actions 在线编译（推荐）
+==================================================
+
+【步骤】
+  1. 将整个 ScannerApp 文件夹上传到你的 GitHub 仓库（推送到 main 或 master 分支）
+  2. GitHub 会自动触发编译，无需任何本地环境
+  3. 编译完成后，在仓库页面点击 "Actions" 标签
+  4. 找到最新的 workflow 运行记录，点击进入
+  5. 在页面底部 "Artifacts" 区域下载 APK
+
+【触发方式】
+  - 自动触发：push 到 main/master 分支时自动编译
+  - 手动触发：Actions → Build Android APK → Run workflow
+
+【APK 文件】
+  - Release APK：ScannerApp-release-{编号}.zip（保留30天）
+  - Debug APK：手动触发时额外生成（保留7天）
+
+【首次上传到 GitHub 步骤】
+  git init
+  git add .
+  git commit -m "Initial commit"
+  git branch -M main
+  git remote add origin https://github.com/你的用户名/你的仓库名.git
+  git push -u origin main
+
+==================================================
+  方式二：本地编译
+==================================================
+
+【环境要求】
+  - Node.js >= 18.x        https://nodejs.org
+  - JDK 17                 https://adoptium.net
+  - Android Studio          https://developer.android.com/studio
+    - Android SDK Platform 34
+    - Android SDK Build-Tools 34.0.0
+
+【步骤】
+  1. 修改 android/local.properties，填入你的 SDK 路径：
+     sdk.dir=C\:\\Users\\你的用户名\\AppData\\Local\\Android\\Sdk
+
+  2. 安装 JS 依赖：
+     npm install
+
+  3. 编译 Debug APK：
+     cd android
+     gradlew.bat assembleDebug
+     输出：android\app\build\outputs\apk\debug\app-debug.apk
+
+  4. 编译 Release APK：
+     cd android
+     gradlew.bat assembleRelease
+     输出：android\app\build\outputs\apk\release\app-release.apk
+
+【注意】
+  - gradle/wrapper/gradle-wrapper.jar 需从其他 RN 项目中复制
+    或执行 npm install 后运行一次 npx react-native init TempApp 获取
+
+==================================================
+  常见问题
+==================================================
+
+  Q: SDK location not found
+  A: 在 android/local.properties 中添加 sdk.dir=你的SDK路径
+
+  Q: Duplicate class kotlin...
+  A: android/app/build.gradle dependencies 末尾添加：
+     constraints { implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.22") }
+
+  Q: GitHub Actions 编译失败
+  A: 查看 Actions 日志，常见原因：
+     - npm install 失败 → 检查 package.json 依赖版本
+     - gradle 编译失败 → 查看具体 BUILD FAILED 信息
+
+==================================================

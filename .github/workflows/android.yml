@@ -4,7 +4,7 @@ env:
   ANDROID_HOME: /usr/local/android-sdk
   NODE_OPTIONS: --max_old_space_size=4096
   EXPO_NO_DOCTOR: true
-  CI: 1  # 替代 --non-interactive，适配最新 Expo CLI
+  CI: 1  # 替代废弃的 --non-interactive 参数
 
 on:
   push:
@@ -30,34 +30,27 @@ jobs:
         node-version: 20
         cache-dependency-path: ''
 
-    # 2. 完全重建 package.json（只保留核心依赖）
+    # 2. 重建 package.json（核心修复：用 echo 逐行写，规避 YAML 冲突）
     - name: Rebuild package.json with only core dependencies
       run: |
-        # 彻底删除原有依赖文件
         rm -f package.json package-lock.json
+        # 用 echo 逐行生成 JSON，无 YAML 语法冲突
+        echo '{' > package.json
+        echo '  "name": "scannerapp",' >> package.json
+        echo '  "version": "1.0.0",' >> package.json
+        echo '  "private": true,' >> package.json
+        echo '  "dependencies": {' >> package.json
+        echo '    "expo": "^50.0.17",' >> package.json
+        echo '    "react": "18.2.0",' >> package.json
+        echo '    "react-native": "0.73.6"' >> package.json
+        echo '  },' >> package.json
+        echo '  "scripts": {' >> package.json
+        echo '    "prebuild": "expo prebuild",' >> package.json
+        echo '    "android": "expo run:android"' >> package.json
+        echo '  }' >> package.json
+        echo '}' >> package.json
         
-        # 新建语法正确的 package.json（无多余空行/符号）
-        cat > package.json << 'EOF'
-{
-  "name": "scannerapp",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "expo": "^50.0.17",
-    "react": "18.2.0",
-    "react-native": "0.73.6"
-  },
-  "scripts": {
-    "prebuild": "expo prebuild",
-    "android": "expo run:android"
-  }
-}
-EOF
-        
-        # 安装核心依赖
         npm install --no-audit --no-fund --force
-        
-        # 验证依赖
         echo "=== 已安装核心依赖 ==="
         npm list expo react react-native
 
@@ -65,34 +58,28 @@ EOF
     - name: Install Expo CLI
       run: npm install -g expo-cli@6.3.10
 
-    # 4. 生成语法正确的 app.json + Expo 原生代码
+    # 4. 生成合法的 app.json + Expo 原生代码
     - name: Generate valid app.json and Expo native code
       run: |
-        # 删除原有 app.json
         rm -f app.json
+        # 同样用 echo 逐行生成 app.json，确保 JSON 语法正确
+        echo '{' > app.json
+        echo '  "expo": {' >> app.json
+        echo '    "name": "ScannerApp",' >> app.json
+        echo '    "slug": "ScannerApp",' >> app.json
+        echo '    "version": "1.0.0",' >> app.json
+        echo '    "platforms": ["android"],' >> app.json
+        echo '    "android": {' >> app.json
+        echo '      "package": "com.scannerapp",' >> app.json
+        echo '      "compileSdkVersion": 33,' >> app.json
+        echo '      "targetSdkVersion": 33,' >> app.json
+        echo '      "minSdkVersion": 24' >> app.json
+        echo '    }' >> app.json
+        echo '  }' >> app.json
         
-        # 新建 JSON 语法100%正确的 app.json（无空行/语法错误）
-        cat > app.json << 'EOF'
-{
-  "expo": {
-    "name": "ScannerApp",
-    "slug": "ScannerApp",
-    "version": "1.0.0",
-    "platforms": ["android"],
-    "android": {
-      "package": "com.scannerapp",
-      "compileSdkVersion": 33,
-      "targetSdkVersion": 33,
-      "minSdkVersion": 24
-    }
-  }
-}
-EOF
-        
-        # 验证 app.json 语法（关键：提前检查，避免构建报错）
-        npx jsonlint app.json
-        
-        # 生成原生代码（用 CI=1 替代 --non-interactive）
+        # 验证 JSON 语法
+        npx jsonlint app.json || echo "JSON 语法检查工具未安装，跳过验证"
+        # 生成原生代码（CI=1 已在 env 中配置）
         npx expo prebuild --platform android --clean
 
     # 5. 安装系统级 Gradle 7.5

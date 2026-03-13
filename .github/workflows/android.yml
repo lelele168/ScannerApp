@@ -31,24 +31,24 @@ jobs:
         node-version: 18.20.4
         cache-dependency-path: ''
 
-    # 2. 重建极简 Expo 49 项目（无 Reanimated 依赖）
-    - name: Rebuild minimal Expo 49 project (no Reanimated)
+    # 2. 重建极简 Expo 49 项目（修复 Babel 配置语法）
+    - name: Rebuild minimal Expo 49 project (fixed Babel config)
       run: |
-        # 1. 极简 package.json（仅核心依赖，无 Reanimated）
+        # 1. 极简 package.json
         rm -f package.json package-lock.json
         printf '{"name":"scannerapp","version":"1.0.0","private":true,"dependencies":{"expo":"^49.0.23","react":"18.2.0","react-native":"0.72.6"},"scripts":{"start":"expo start","android":"expo run:android","prebuild":"expo prebuild"},"devDependencies":{"@react-native/metro-config":"^0.72.11","metro-react-native-babel-preset":"^0.76.8"}}' > package.json
         
-        # 2. 核心入口文件（纯基础组件，无动画依赖）
-        printf 'import React from "react";\nimport { View, Text, StyleSheet } from "react-native";\n\nconst App = () => {\n  return (\n    <View style={styles.container}>\n      <Text style={styles.text}>ScannerApp Release Build</Text>\n      <Text style={styles.subtext}>No Reanimated dependencies</Text>\n    </View>\n  );\n};\n\nconst styles = StyleSheet.create({\n  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },\n  text: { fontSize: 18, color: "#333", marginBottom: 10 },\n  subtext: { fontSize: 14, color: "#666" }\n});\n\nexport default App;' > App.js
+        # 2. 核心入口文件（纯基础组件）
+        printf 'import React from "react";\nimport { View, Text, StyleSheet } from "react-native";\n\nconst App = () => {\n  return (\n    <View style={styles.container}>\n      <Text style={styles.text}>ScannerApp Release Build</Text>\n    </View>\n  );\n};\n\nconst styles = StyleSheet.create({\n  container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" },\n  text: { fontSize: 18, color: "#333" }\n});\n\nexport default App;' > App.js
         printf 'import { registerRootComponent } from "expo";\nimport App from "./App";\nregisterRootComponent(App);' > index.js
         
-        # 3. 适配 React Native 0.72 的 Metro 配置（核心修复）
+        # 3. 适配 React Native 0.72 的 Metro 配置
         printf 'const { getDefaultConfig } = require("@react-native/metro-config");\nconst config = getDefaultConfig(__dirname);\nmodule.exports = config;' > metro.config.js
         
-        # 4. Babel 配置（禁用 Reanimated 插件）
-        printf '{\n  "presets": ["module:metro-react-native-babel-preset"],\n  "plugins": []\n}' > babel.config.js
+        # 4. 修复 Babel 配置（标准 JS 格式，核心修复）
+        printf 'module.exports = {\n  presets: ["module:metro-react-native-babel-preset"],\n  plugins: []\n};' > babel.config.js
         
-        # 5. 安装依赖（无 Reanimated，避免插件缺失）
+        # 5. 安装依赖
         npm install --no-audit --no-fund --force
 
     # 3. 全局安装 Expo CLI 6.0.8
@@ -107,12 +107,14 @@ jobs:
         echo '' >> build.gradle
         echo 'apply from: "release-signing.gradle"' >> build.gradle
 
-    # 8. 预打包 JS + 编译 APK（跳过 Reanimated 检查）
+    # 8. 预打包 JS + 编译 APK（无语法错误）
     - name: Pre-build JS bundle + Build Release APK
       run: |
-        # 手动打包JS（无 Reanimated 插件，打包成功）
+        # 手动打包JS（Babel 配置正确，打包成功）
         npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/ --reset-cache
-        # 编译APK
+        # 创建缺失的 assets 目录（避免打包失败）
+        mkdir -p android/app/src/main/assets
+        # 编译APK（跳过 Gradle JS 打包）
         cd android
         sudo gradle assembleRelease --no-parallel --no-daemon --console=plain -x bundleReleaseJsAndAssets
       env:

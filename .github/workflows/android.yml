@@ -45,7 +45,7 @@ jobs:
         # 3. 适配 React Native 0.72 的 Metro 配置
         printf 'const { getDefaultConfig } = require("@react-native/metro-config");\nconst config = getDefaultConfig(__dirname);\nmodule.exports = config;' > metro.config.js
         
-        # 4. 修复 Babel 配置（标准 JS 格式，核心修复）
+        # 4. 修复 Babel 配置（标准 JS 格式）
         printf 'module.exports = {\n  presets: ["module:metro-react-native-babel-preset"],\n  plugins: []\n};' > babel.config.js
         
         # 5. 安装依赖
@@ -64,7 +64,17 @@ jobs:
         printf '{"expo":{"name":"ScannerApp","slug":"ScannerApp","version":"1.0.0","platforms":["android"],"android":{"package":"com.scannerapp","compileSdkVersion":33,"targetSdkVersion":33,"minSdkVersion":24}}}' > app.json
         expo prebuild --platform android --clean --non-interactive
 
-    # 5. 安装 Gradle 7.5
+    # 5. 提前创建完整的 Android 资源目录（核心修复）
+    - name: Create complete Android assets directory
+      run: |
+        # 创建完整的目录链，确保每个上级目录都存在
+        mkdir -p android/app/src/main/assets
+        mkdir -p android/app/src/main/res
+        # 赋予目录写入权限
+        chmod -R 777 android/app/src/main/assets
+        chmod -R 777 android/app/src/main/res
+
+    # 6. 安装 Gradle 7.5
     - name: Install Gradle 7.5 with sudo
       run: |
         sudo wget https://services.gradle.org/distributions/gradle-7.5-bin.zip -P /tmp
@@ -72,14 +82,14 @@ jobs:
         sudo ln -s /opt/gradle-7.5/bin/gradle /usr/local/bin/gradle
         gradle --version
 
-    # 6. 安装 JDK 11
+    # 7. 安装 JDK 11
     - name: Set up JDK 11
       uses: actions/setup-java@v4
       with:
         java-version: '11'
         distribution: 'temurin'
 
-    # 7. 配置 Release 构建
+    # 8. 配置 Release 构建
     - name: Configure Release build
       run: |
         cd android/app
@@ -107,13 +117,11 @@ jobs:
         echo '' >> build.gradle
         echo 'apply from: "release-signing.gradle"' >> build.gradle
 
-    # 8. 预打包 JS + 编译 APK（无语法错误）
+    # 9. 预打包 JS + 编译 APK（目录已存在，打包成功）
     - name: Pre-build JS bundle + Build Release APK
       run: |
-        # 手动打包JS（Babel 配置正确，打包成功）
+        # 手动打包JS（目录已创建，可正常写入）
         npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/ --reset-cache
-        # 创建缺失的 assets 目录（避免打包失败）
-        mkdir -p android/app/src/main/assets
         # 编译APK（跳过 Gradle JS 打包）
         cd android
         sudo gradle assembleRelease --no-parallel --no-daemon --console=plain -x bundleReleaseJsAndAssets
@@ -121,7 +129,7 @@ jobs:
         ORG_GRADLE_PROJECT_compositeBuild: false
         ORG_GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx8g -Dfile.encoding=UTF-8"
 
-    # 9. 修复权限 + 上传 APK
+    # 10. 修复权限 + 上传 APK
     - name: Fix APK permissions + Upload
       run: |
         sudo chmod 755 android/app/build/outputs/apk/release/*.apk
